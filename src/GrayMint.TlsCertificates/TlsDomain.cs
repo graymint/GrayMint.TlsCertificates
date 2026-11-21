@@ -55,4 +55,15 @@ public static class TlsDomain
 
         return host;
     }
+
+    /// <summary>
+    /// A DNS name, as a user, a setting or a DNS answer gives it, in the form of <see cref="Normalize"/>: but a port,
+    /// which a DNS name never has, is refused rather than dropped, so a domain is checked as the very name it is saved as.
+    /// </summary>
+    /// <param name="name">A host name, such as <c>Domains.Example.com.</c>.</param>
+    /// <returns>The name in its one form, or <see langword="null"/> for a port or anything <see cref="Normalize"/> refuses.</returns>
+    public static string? NormalizeName(string? name)
+    {
+        return name == null || name.Contains(':') ? null : Normalize(name);
+    }
 }

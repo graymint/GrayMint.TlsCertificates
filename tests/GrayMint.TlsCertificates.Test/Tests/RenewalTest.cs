@@ -138,16 +138,16 @@ public class RenewalTest(TestContext testContext)
         Assert.AreEqual(1, info?.ErrorCount);
         Assert.IsFalse(info?.HasCertificate);
 
-        // 5 minutes after the first failure, 10 after the second
+        // 12 minutes after the first failure, 24 after the second
         await host.Renew(CancellationToken);
         Assert.AreEqual(1, host.AcmeClient.OrderCount(domain));
-        host.Time.Advance(TimeSpan.FromMinutes(5));
+        host.Time.Advance(TimeSpan.FromMinutes(12));
         await host.Renew(CancellationToken);
         Assert.AreEqual(2, host.AcmeClient.OrderCount(domain));
-        host.Time.Advance(TimeSpan.FromMinutes(5));
+        host.Time.Advance(TimeSpan.FromMinutes(12));
         await host.Renew(CancellationToken);
         Assert.AreEqual(2, host.AcmeClient.OrderCount(domain));
-        host.Time.Advance(TimeSpan.FromMinutes(5));
+        host.Time.Advance(TimeSpan.FromMinutes(12));
         await host.Renew(CancellationToken);
         Assert.AreEqual(3, host.AcmeClient.OrderCount(domain));
         Assert.AreEqual(3, (await host.GetInfo(domain, CancellationToken))?.ErrorCount);
@@ -186,22 +186,58 @@ public class RenewalTest(TestContext testContext)
 
     [TestMethod]
     [EveryDatabase]
-    public async Task RetryNow_lets_the_next_order_go_without_the_wait(TestDatabaseProvider provider)
+    public async Task Without_a_self_check_the_authority_alone_reads_the_challenge(TestDatabaseProvider provider)
+    {
+        await using var host = await TestTlsHost.Create(provider, CancellationToken,
+            configureRenewal: options => options.SelfCheckHandlerFactory = null);
+        var domain = host.Domains.Add();
+        host.Domains.SetForeign(domain); // a read of its own would find another server's answer
+        var validated = new List<string>();
+        host.AcmeClient.OnValidate = order => {
+            validated.Add(order.Domain);
+            return Task.CompletedTask;
+        };
+
+        await host.Renew(CancellationToken);
+
+        CollectionAssert.Contains(validated, domain, "the authority was asked at once");
+        Assert.IsTrue((await host.GetInfo(domain, CancellationToken))?.HasCertificate);
+    }
+
+    [TestMethod]
+    [EveryDatabase]
+    public async Task RetryNow_shortens_the_wait_to_the_shortest_but_never_takes_it_away(TestDatabaseProvider provider)
     {
         await using var host = await TestTlsHost.Create(provider, CancellationToken);
         var domain = host.Domains.Add();
         host.AcmeClient.Fail(domain, () => new AcmeException("Not yet."));
         await host.Renew(CancellationToken);
+        host.Time.Advance(TimeSpan.FromMinutes(12));
+        await host.Renew(CancellationToken); // the second failure, after which the wait is 24 minutes
         host.AcmeClient.Succeed(domain);
 
-        await using (var scope = host.Services.CreateAsyncScope())
-            Assert.IsTrue(await scope.ServiceProvider.GetRequiredService<TlsCertificateService>().RetryNow(domain, CancellationToken));
+        // however often it is asked, the next order waits the shortest wait after the last failure, so the authority never
+        // sees more failed validations than it allows
+        Assert.IsTrue(await RetryNow(host, domain));
+        Assert.IsEmpty((await host.Renew(CancellationToken)).Issued);
+        Assert.IsFalse(await RetryNow(host, domain), "its failures are forgotten once");
+        Assert.IsEmpty((await host.Renew(CancellationToken)).Issued);
+        Assert.AreEqual(2, host.AcmeClient.OrderCount(domain));
+
+        // 12 minutes after the last failure, not 24
+        host.Time.Advance(TimeSpan.FromMinutes(12));
         CollectionAssert.AreEqual(new[] { domain }, (await host.Renew(CancellationToken)).Issued.ToArray());
 
         var info = await host.GetInfo(domain, CancellationToken);
         Assert.IsTrue(info?.HasCertificate);
         Assert.AreEqual(0, info?.ErrorCount);
         Assert.IsNull(info?.ErrorMessage);
+    }
+
+    private async Task<bool> RetryNow(TestTlsHost host, string domain)
+    {
+        await using var scope = host.Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<TlsCertificateService>().RetryNow(domain, CancellationToken);
     }
 
     [TestMethod]

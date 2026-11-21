@@ -1,0 +1,11 @@
+; The domain checks' test zone as a resolver that still caches some records as they were (DomainCheckTest).
+$ORIGIN example.test.
+$TTL 60
+@                    IN SOA   ns.example.test. admin.example.test. 1 3600 600 86400 60
+@                    IN NS    ns.example.test.
+ns                   IN A     192.0.2.53
+target               IN A     192.0.2.10
+
+; a user's domain that pointed elsewhere a moment ago
+moved                IN CNAME old.example.test.
+old                  IN A     192.0.2.40

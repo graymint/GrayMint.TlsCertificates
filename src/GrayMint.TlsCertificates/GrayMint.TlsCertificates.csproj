@@ -24,6 +24,11 @@
 		<PackageReference Include="GrayMint.Common.Acme" Version="2.1.315" />
 	</ItemGroup>
 
+	<!-- the domain checks' lookups, of servers the checks choose, which the system's resolver API can't -->
+	<ItemGroup>
+		<PackageReference Include="DnsClient" Version="1.8.0" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<InternalsVisibleTo Include="GrayMint.TlsCertificates.Test" />
 	</ItemGroup>

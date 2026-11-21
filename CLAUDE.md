@@ -1,8 +1,9 @@
 # GrayMint.TlsCertificates
 
 TLS certificates for the domains a host serves: ordered and renewed from an ACME authority by a renewal in one host,
-kept in tables of its own on PostgreSQL or SQL Server, and served by Kestrel in any host. The protocol is
-GrayMint.Common.Acme's; this module keeps and decides.
+kept in tables of its own on PostgreSQL or SQL Server, and served by Kestrel in any host; and the checks of a user's
+domain before the host serves it, that it points to the host and is the user's. The protocol is GrayMint.Common.Acme's;
+this module keeps and decides.
 Read [docs/design.md](docs/design.md) before changing code: it says what the code holds, what the database holds,
 and why each is where it is. Keep it, and the README, true in the same change that makes them wrong.
 
@@ -12,15 +13,16 @@ and why each is where it is. Keep it, and the README, true in the same change th
    person. Examples use neutral names: a shop, a user, `example.com`.
 2. **A guard comes with its test, written so it can't pass for another reason.** Whatever keeps the certificates
    right (the lease, a domain's form, the wait after a failure, a challenge's token and domain, what an error may
-   say, the setup's checks) gets a test that checks exactly what it refuses, and that nothing was kept.
+   say, the setup's checks, the domain checks' answers, the ownership record's format) gets a test that checks exactly
+   what it refuses, and that nothing was kept.
 3. **One renewal at a time.** Every run takes the lease first, renews it before each order and gives it back at its
    end; nothing writes the certificates outside a run, but `RetryNow`, which only lifts a wait.
 4. **A row is written by one statement.** A certificate and a failure never go out in one save of tracked rows:
    each write is an `ExecuteUpdate` of what it changes.
-5. **Tests run on a real PostgreSQL, a real SQL Server and a real ACME authority.** `docker compose up -d`, then
-   `dotnet test`. Every case that touches the database runs on both (`[EveryDatabase]`), each in a database of its
-   own, made as the setup makes it; the authority's tests run on Pebble. Run them after every change; a change isn't
-   done until they pass.
+5. **Tests run on a real PostgreSQL, a real SQL Server, a real ACME authority and a real DNS server.**
+   `docker compose up -d`, then `dotnet test`. Every case that touches the database runs on both (`[EveryDatabase]`),
+   each in a database of its own, made as the setup makes it; the authority's tests run on Pebble, and the domain
+   checks' on CoreDNS, with the zone of `tests/dns`. Run them after every change; a change isn't done until they pass.
 6. **One model for both databases.** Whatever EF can say goes through EF. The package names no database provider:
    the host names its own.
 7. **Fail loudly.** A setting that is wrong stops the registration; a database without the tables, or with tables of
@@ -34,8 +36,9 @@ and why each is where it is. Keep it, and the README, true in the same change th
 ## Code
 
 - One type per file, whatever its visibility. `Persistence` is internal throughout: a host sees the services, the
-  options, the classes they take and give, the two interfaces it implements, `TlsDomain`, `TlsCertificatesSchema` and
-  the registration, and nothing else. A service's constructor is internal, so only the registration makes one.
+  options, the classes they take and give, the interfaces it implements (`ITlsDomainDns` in its tests alone),
+  `TlsDomain`, `TlsCertificatesSchema` and the registration, and nothing else. A service's constructor is internal, so
+  only the registration makes one.
 - Every public type and member has an XML doc (`///`): what a caller gets, and what refuses it. The build fails
   without one.
 - Every time is UTC, written as `TimeProvider` gives it and read back as UTC; a test moves the clock.

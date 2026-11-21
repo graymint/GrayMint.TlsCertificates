@@ -1,0 +1,37 @@
+; The domain checks' test zone (DomainCheckTest). The ownership values are the default format's, for alice and carol.
+$ORIGIN example.test.
+$TTL 60
+@                    IN SOA   ns.example.test. admin.example.test. 1 3600 600 86400 60
+@                    IN NS    ns.example.test.
+ns                   IN A     192.0.2.53
+
+; the name users point their domains to
+target               IN A     192.0.2.10
+
+; a user's domain that points here, with alice's ownership record
+shop                 IN CNAME target.example.test.
+_domain-verify.shop  IN TXT   "domain-verify=75de7c9244c20069d6cd66d637372cf0"
+
+; one that points here in other letters, as DNS is blind to case
+upper                IN CNAME TARGET.Example.Test.
+
+; one that points to another name
+other                IN CNAME elsewhere.example.test.
+elsewhere            IN A     192.0.2.20
+
+; one with an address of its own, and no CNAME
+bare                 IN A     192.0.2.30
+
+; carol's ownership record in two pieces, which make one value
+split                IN CNAME target.example.test.
+_domain-verify.split IN TXT   "domain-verify=e11ed4" "7862ca51796806f518abbaf26e"
+
+; one that points to another user's domain, which points here: it points there
+chain                IN CNAME shop.example.test.
+
+; one whose ownership record is a CNAME to alice's record of another domain: it proves nothing for this one
+alias                IN CNAME target.example.test.
+_domain-verify.alias IN CNAME _domain-verify.shop.example.test.
+
+; one that points here since a moment ago (the stale server still has it as it was)
+moved                IN CNAME target.example.test.

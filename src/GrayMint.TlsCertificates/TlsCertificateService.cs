@@ -43,23 +43,25 @@ public sealed class TlsCertificateService
     }
 
     /// <summary>
-    /// Lets the domain's next order go without the wait its failures put on it, as a host does when its user has fixed
-    /// the domain: the renewal's next run orders it, if it is due.
+    /// Shortens the wait the domain's failures put on its next order to the shortest one,
+    /// <see cref="TlsCertificateRenewalOptions.RetryInterval"/> after its last failure, and starts its count of failures
+    /// again, as a host does when its user has fixed the domain: the renewal's first run after that orders it. The wait
+    /// is never taken away, so a user who saves a domain again and again can't make the authority refuse it for its
+    /// failed validations.
     /// </summary>
     /// <param name="domain">The domain, in any form <see cref="TlsDomain.Normalize"/> takes.</param>
     /// <param name="cancellationToken">The token that cancels the write.</param>
-    /// <returns><see langword="true"/> if the domain had a wait to take away.</returns>
+    /// <returns><see langword="true"/> if the domain had failures in a row to forget.</returns>
     public async Task<bool> RetryNow(string domain, CancellationToken cancellationToken)
     {
         var name = TlsDomain.Normalize(domain);
         if (name == null)
             return false;
 
+        // the failure's time stays, which the shortest wait counts from
         var updated = await _dbContext.Certificates
             .Where(x => x.Domain == name && x.ErrorCount > 0)
-            .ExecuteUpdateAsync(x => x
-                .SetProperty(y => y.ErrorCount, 0)
-                .SetProperty(y => y.ErrorTime, (DateTime?)null), cancellationToken);
+            .ExecuteUpdateAsync(x => x.SetProperty(y => y.ErrorCount, 0), cancellationToken);
         return updated == 1;
     }
 

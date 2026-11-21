@@ -1,5 +1,5 @@
-# What the tests and development need beside the code: the two databases the certificates' tables run on, and a test
-# ACME authority.
+# What the tests and development need beside the code: the two databases the certificates' tables run on, a test ACME
+# authority, and a DNS server with a test zone.
 name: graymint-tlscertificates
 
 services:
@@ -61,6 +61,21 @@ services:
       PEBBLE_WFE_NONCEREJECT: "0"
     ports:
       - "127.0.0.1:14041:14000"
+
+  # DNS servers for the domain checks' tests: the zone of tests/dns, which no public DNS has, on port 15353, and on 15354
+  # as a resolver that still caches some of it as it was. They answer as soon as they run, so they need no health check
+  # for `--wait`.
+  dns:
+    image: coredns/coredns:1.15.0
+    container_name: graymint-tlscertificates-dns
+    command: ["-conf", "/etc/coredns/Corefile"]
+    volumes:
+      - ./tests/dns:/etc/coredns:ro
+    ports:
+      - "127.0.0.1:15353:53/udp"
+      - "127.0.0.1:15353:53/tcp"
+      - "127.0.0.1:15354:54/udp"
+      - "127.0.0.1:15354:54/tcp"
 
 volumes:
   postgres-data:

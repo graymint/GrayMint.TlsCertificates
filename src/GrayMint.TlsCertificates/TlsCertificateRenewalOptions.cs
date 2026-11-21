@@ -27,8 +27,12 @@ public class TlsCertificateRenewalOptions
     /// </summary>
     public double RenewWhenLifetimeLeft { get; set; } = 1.0 / 3;
 
-    /// <summary>The wait after a domain's first failed order; it doubles with each failure in a row.</summary>
-    public TimeSpan RetryInterval { get; set; } = TimeSpan.FromMinutes(5);
+    /// <summary>
+    /// The wait after a domain's first failed order, which doubles with each failure in a row, and the shortest wait
+    /// after any failure, <see cref="TlsCertificateService.RetryNow"/>'s included: 12 minutes, as Let's Encrypt allows a
+    /// domain five failed validations an hour, which a domain keeps to however often it fails or is retried.
+    /// </summary>
+    public TimeSpan RetryInterval { get; set; } = TimeSpan.FromMinutes(12);
 
     /// <summary>The longest wait between two failed orders of a domain.</summary>
     public TimeSpan MaxRetryInterval { get; set; } = TimeSpan.FromDays(1);
@@ -41,14 +45,13 @@ public class TlsCertificateRenewalOptions
 
     /// <summary>
     /// Makes the connection for the renewal's own read of a challenge's URL, before the authority is asked to read it,
-    /// so a domain that doesn't reach the host fails without a failed validation at the authority, which allows few. The
-    /// domain is the host's user's: the handler should connect to public addresses only, checked as it connects, and
-    /// follow no redirect. Required unless <see cref="SkipSelfCheck"/>.
+    /// so a domain that doesn't reach the host fails without a failed validation at the authority. The domain is the
+    /// host's user's: the handler should connect to public addresses only, checked as it connects, and follow no
+    /// redirect. <see langword="null"/>, the default, orders without it: the authority's read is the only one, and the
+    /// wait after a failure (<see cref="RetryInterval"/>) keeps a domain within the failed validations the authority
+    /// allows.
     /// </summary>
     public Func<IServiceProvider, HttpMessageHandler>? SelfCheckHandlerFactory { get; set; }
-
-    /// <summary>Orders without the renewal's own read of the challenge first, which only a host on a closed network wants.</summary>
-    public bool SkipSelfCheck { get; set; }
 
     /// <summary>How long the renewal's own read of a challenge may take.</summary>
     public TimeSpan SelfCheckTimeout { get; set; } = TimeSpan.FromSeconds(30);
@@ -73,10 +76,6 @@ public class TlsCertificateRenewalOptions
         if (RenewWhenLifetimeLeft is <= 0 or >= 1)
             throw new ArgumentOutOfRangeException(nameof(RenewWhenLifetimeLeft), RenewWhenLifetimeLeft,
                 $"{nameof(RenewWhenLifetimeLeft)} is a share of a lifetime, more than 0 and less than 1.");
-        if (SelfCheckHandlerFactory == null && !SkipSelfCheck)
-            throw new ArgumentException(
-                $"{nameof(SelfCheckHandlerFactory)} is required, as the renewal reads each challenge before the " +
-                $"authority does; set {nameof(SkipSelfCheck)} to order without it.");
 
         TlsCertificatesOptions.ThrowIfNotPositive(Interval, nameof(Interval));
         TlsCertificatesOptions.ThrowIfNotPositive(RetryInterval, nameof(RetryInterval));

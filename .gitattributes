@@ -5,6 +5,9 @@
 # Shell scripts must stay LF even on Windows (a CRLF shebang breaks them on Linux).
 *.sh text eol=lf
 
+# The test DNS server's config and zone, which its container reads from the working tree as they are.
+tests/dns/** text eol=lf
+
 # Binary assets — never normalize.
 *.png binary
 *.ico binary

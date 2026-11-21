@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace GrayMint.TlsCertificates;
@@ -103,6 +104,31 @@ public static class TlsCertificatesExtension
                 serviceProvider.GetRequiredService<TimeProvider>(),
                 serviceProvider.GetRequiredService<ILogger<TlsCertificateRenewer>>()));
             services.AddHostedService<TlsCertificateRenewalJob>();
+            return services;
+        }
+
+        /// <summary>
+        /// Registers <see cref="TlsDomainChecker"/>, the checks of a user's domain before the host serves it: that it points
+        /// to the host, and that it is the user's. It needs no tables, nor the module's other registrations. The DNS it
+        /// reads is the host's <see cref="ITlsDomainDns"/> when one is registered, and the module's own otherwise.
+        /// </summary>
+        /// <param name="configure">Sets the options; they are checked here, and a wrong one stops the registration.</param>
+        /// <returns>The services, to register more.</returns>
+        public IServiceCollection AddGrayMintTlsDomainChecks(Action<TlsDomainCheckOptions> configure)
+        {
+            var options = new TlsDomainCheckOptions();
+            configure(options);
+            options.Validate();
+
+            services.AddSingleton(Options.Create(options));
+
+            // the checks need nothing of a host, logging neither: a host without it logs nothing of the lookups
+            services.TryAddSingleton<ITlsDomainDns>(serviceProvider => new TlsDomainDns(
+                serviceProvider.GetRequiredService<IOptions<TlsDomainCheckOptions>>(),
+                serviceProvider.GetService<ILogger<TlsDomainDns>>() ?? NullLogger<TlsDomainDns>.Instance));
+            services.AddSingleton(serviceProvider => new TlsDomainChecker(
+                serviceProvider.GetRequiredService<ITlsDomainDns>(),
+                serviceProvider.GetRequiredService<IOptions<TlsDomainCheckOptions>>()));
             return services;
         }
     }

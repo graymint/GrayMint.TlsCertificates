@@ -136,8 +136,8 @@ public sealed class TlsCertificateRenewer
     // whether the domain's certificate is to be ordered now
     private bool IsDue(CertificateModel certificate, DateTime now)
     {
-        if (certificate is { ErrorCount: > 0, ErrorTime: not null } &&
-            now < certificate.ErrorTime.Value + RetryInterval(certificate.ErrorCount))
+        // a failure's wait, which RetryNow shortens to the shortest one by its count, but never takes away
+        if (certificate.ErrorTime is { } errorTime && now < errorTime + RetryInterval(certificate.ErrorCount))
             return false;
 
         if (certificate.Pfx == null || certificate.IssueTime == null || certificate.ExpirationTime == null ||
@@ -194,7 +194,7 @@ public sealed class TlsCertificateRenewer
     private Func<HttpMessageHandler>? CreateSelfCheckHandlerFactory()
     {
         var factory = _options.SelfCheckHandlerFactory;
-        return _options.SkipSelfCheck || factory == null ? null : () => factory(_serviceProvider);
+        return factory == null ? null : () => factory(_serviceProvider);
     }
 
     private async Task Keep(string domain, byte[] pfx, CancellationToken cancellationToken)

@@ -1,0 +1,11 @@
+# The domain checks' test DNS servers (DomainCheckTest): the zone example.test and nothing else, as no test asks a name
+# outside it. Port 53 has the zone as it is; port 54 has it as a resolver that still caches some records as they were.
+example.test:53 {
+    file /etc/coredns/example.test.db
+    errors
+}
+
+example.test:54 {
+    file /etc/coredns/example.test.stale.db
+    errors
+}
