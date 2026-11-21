@@ -1,0 +1,67 @@
+# What the tests and development need beside the code: the two databases the certificates' tables run on, and a test
+# ACME authority.
+name: graymint-tlscertificates
+
+services:
+  # Port 5441 lets it run beside other PostgreSQL servers, and it listens on this machine only, since its password is
+  # public.
+  postgres:
+    image: postgres:19
+    container_name: graymint-tlscertificates-postgres
+    # tests run side by side, each with a database of its own
+    command: ["postgres", "-c", "max_connections=300"]
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "127.0.0.1:5441:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    # by TCP: while the first start sets the database up, the server takes the socket only, and then restarts.
+    # CI starts this file with `--wait`, which runs the tests once this says healthy.
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+      start_interval: 1s
+
+  # Port 14341 lets it run beside another SQL Server on 1433, and it listens on this machine only, since its password
+  # is public.
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2025-latest
+    container_name: graymint-tlscertificates-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: GrayMint-TlsCertificates-2026
+    ports:
+      - "127.0.0.1:14341:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    # it takes a while to start, and answers only once it has
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S 127.0.0.1 -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" -b -o /dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+      start_interval: 2s
+
+  # Let's Encrypt's own test authority, which speaks ACME as Let's Encrypt does. It finds every challenge valid without
+  # reading it, as it can't reach a test's server, so the tests that read a challenge read it themselves. Its
+  # directory is https://127.0.0.1:14041/dir, under a certificate of its own that nothing trusts.
+  pebble:
+    image: ghcr.io/letsencrypt/pebble:2
+    container_name: graymint-tlscertificates-pebble
+    environment:
+      PEBBLE_VA_ALWAYS_VALID: "1"
+      PEBBLE_VA_NOSLEEP: "1"
+      # a nonce is refused at random by default, which a client survives by retrying, but a test needn't wait on
+      PEBBLE_WFE_NONCEREJECT: "0"
+    ports:
+      - "127.0.0.1:14041:14000"
+
+volumes:
+  postgres-data:
+  sqlserver-data:
