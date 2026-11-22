@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net10.0</TargetFramework>
+		<TargetFramework>net11.0</TargetFramework>
 		<IsPackable>true</IsPackable>
 		<Description>TLS certificates for the domains an app serves, from Let's Encrypt or another ACME authority: ordered and renewed by a job in one host, kept in tables of their own on PostgreSQL or SQL Server, and served by Kestrel in any host, each domain with its own.</Description>
 		<!-- The public API's docs ship in the package, and a public member without them fails the build. -->
@@ -16,12 +16,12 @@
 
 	<!-- No database provider: the host names its own, and the tables go on the one it is given. -->
 	<ItemGroup>
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.15" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="11.0.0" />
 	</ItemGroup>
 
 	<!-- the protocol: the ACME account and order, the challenge's answer and Kestrel's certificate cache -->
 	<ItemGroup>
-		<PackageReference Include="GrayMint.Common.Acme" Version="2.1.315" />
+		<PackageReference Include="GrayMint.Common.Acme" Version="2.1.318" />
 	</ItemGroup>
 
 	<!-- the domain checks' lookups, of servers the checks choose, which the system's resolver API can't -->

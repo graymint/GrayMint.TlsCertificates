@@ -28,7 +28,7 @@ and why each is where it is. Keep it, and the README, true in the same change th
 7. **Fail loudly.** A setting that is wrong stops the registration; a database without the tables, or with tables of
    another version, stops the start; so does a host without its domains or protector. The renewal's job logs a run
    that fails and runs the next: a stopped renewal lets every certificate expire without a word.
-8. **.NET 10**, pinned by `global.json`.
+8. **.NET 11**, named by `global.json`.
 9. **A change to the tables raises their version.** The start takes tables of `TlsCertificatesSchema.Version` alone.
    A change to the model raises it, and gives the setup a step that takes tables of the version before to it, with a
    test that runs the step on such tables, in the same change.
